@@ -7,14 +7,18 @@ class Event < ActiveRecord::Base
 
     # Retrieve all events affecting `date_from` and the 6 following days.
     events = Event.where('starts_at < ?', date_from + 7.days)
-                  .where('starts_at >= ?', date_from)
+                  .where('starts_at >= ? OR weekly_recurring = ?', date_from, true)
                   .order(starts_at: :asc)
 
     # Discretize events and group them by kind.
     slots = { 'opening' => SortedSet.new, 'appointment' => Set.new }
     events.each do |event|
-      slot = event.starts_at
-      while slot < event.ends_at do
+      # Calculate the number of weeks between the event date and `date_from` (will
+      # be 0 for non recurring events).
+      offset = ((date_from - 1 - event.starts_at.to_date).to_i / 7 + 1).weeks
+      slot = event.starts_at + offset
+      last_slot = event.ends_at + offset
+      while slot < last_slot do
         slots[event.kind] << slot
         slot += pitch
       end
