@@ -44,4 +44,22 @@ class EventTest < ActiveSupport::TestCase
     availabilities = Event.availabilities DateTime.parse('2014-08-10')
     assert_equal ['9:30', '10:00', '11:30', '12:00'], availabilities[1][:slots]
   end
+
+  test "opening with a 15-minute offset and custom duration" do
+    Event.create kind: 'opening', starts_at: DateTime.parse('2014-08-11 09:45'), ends_at: DateTime.parse('2014-08-11 10:45')
+
+    availabilities = Event.availabilities DateTime.parse('2014-08-10')
+    assert_equal ['9:45', '10:15'], availabilities[1][:slots]
+
+    availabilities = Event.availabilities DateTime.parse('2014-08-10'), 20.minutes
+    assert_equal ['9:45', '10:05', '10:25'], availabilities[1][:slots]
+
+    availabilities = Event.availabilities DateTime.parse('2014-08-10'), 40.minutes
+    assert_equal ['9:45'], availabilities[1][:slots]
+
+    Event.create kind: 'appointment', starts_at: DateTime.parse('2014-08-11 09:45'), ends_at: DateTime.parse('2014-08-11 10:05')
+
+    availabilities = Event.availabilities DateTime.parse('2014-08-10'), 40.minutes
+    assert_equal ['10:05'], availabilities[1][:slots]
+  end
 end
