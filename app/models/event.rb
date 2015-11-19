@@ -1,13 +1,7 @@
 require 'set'
 
 class Event < ActiveRecord::Base
-  def self.availabilities(date_from, duration=30.minutes)
-    pitch = 5.minutes
-
-    unless duration % pitch == 0
-      raise ArgumentError.new('duration must be a multiple of %d minutes' % (pitch.to_i / 60))
-    end
-
+  def self.availabilities(date_from, duration = 30.minutes)
     date_from = date_from.to_date
 
     # Retrieve all events affecting `date_from` and the 6 following days.
@@ -32,6 +26,12 @@ class Event < ActiveRecord::Base
     # Extract available slots from events (grouped them by day).
     availabilities = {}
     events.group_by { |e| e[:date] }.map do |date, events|
+      # Find the highest suitable pitch to discretize events.
+      first = events[0][:starts_at]
+      pitch = events.reduce(duration / 1.minute) { |pitch, event|
+        [event[:starts_at], event[:ends_at]].map { |t| pitch.gcd((t - first).to_i / 60) }.min
+      }.minutes
+
       # Discretize events and group them by kind.
       slots = { 'opening' => SortedSet.new, 'appointment' => Set.new }
       events.each do |event|

@@ -62,4 +62,16 @@ class EventTest < ActiveSupport::TestCase
     availabilities = Event.availabilities DateTime.parse('2014-08-10'), 40.minutes
     assert_equal ['10:05'], availabilities[1][:slots]
   end
+
+  test "openings with random offsets" do
+    Event.create kind: 'opening', starts_at: DateTime.parse('2014-08-04 09:30'), ends_at: DateTime.parse('2014-08-04 10:15'), weekly_recurring: true
+    Event.create kind: 'opening', starts_at: DateTime.parse('2014-08-11 10:40'), ends_at: DateTime.parse('2014-08-11 12:05')
+    Event.create kind: 'appointment', starts_at: DateTime.parse('2014-08-11 09:55'), ends_at: DateTime.parse('2014-08-11 10:10')
+
+    availabilities = Event.availabilities DateTime.parse('2014-08-10')
+    assert_equal ['10:40', '11:10'], availabilities[1][:slots]
+
+    availabilities = Event.availabilities DateTime.parse('2014-08-10'), 20.minutes
+    assert_equal ['9:30', '10:40', '11:00', '11:20', '11:40'], availabilities[1][:slots]
+  end
 end
