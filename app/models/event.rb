@@ -1,5 +1,3 @@
-require 'set'
-
 class Event < ActiveRecord::Base
   def self.availabilities(date, duration = 30.minutes)
     duration = duration.seconds
