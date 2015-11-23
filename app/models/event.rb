@@ -37,8 +37,9 @@ class Event < ActiveRecord::Base
           avail = avail.begin..[avail.end, event.end].max
         end
       when :appointment
-        avails << (avail.begin..event.begin)
-        avail = event.end..avail.end
+        next unless event.end > avail.begin
+        avails << (avail.begin..[avail.end, event.begin].min)
+        avail = event.end..[avail.end, event.end].max
       end
     end
     avails << avail
