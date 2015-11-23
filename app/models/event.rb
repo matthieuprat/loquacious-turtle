@@ -1,6 +1,6 @@
 class Event < ActiveRecord::Base
   def self.availabilities(date, duration = 30.minutes)
-    duration = duration.seconds
+    duration = duration.fdiv(1.day)
     date = date.to_date
 
     # Retrieve all events affecting `date` and the 6 following days.
@@ -44,7 +44,7 @@ class Event < ActiveRecord::Base
     avails.shift # Slash the fake availability.
 
     # Chunk availability periods into slots and group them by day.
-    slots = avails.map { |a| a.begin.step(a.end - duration, duration.fdiv(1.day)) }
+    slots = avails.map { |a| a.begin.step(a.end - duration, duration) }
                   .flat_map(&:to_a)
                   .group_by(&:to_date)
 
