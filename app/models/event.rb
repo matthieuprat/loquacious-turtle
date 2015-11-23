@@ -7,7 +7,7 @@ class Event < ActiveRecord::Base
 
     # Retrieve all events affecting `date` and the 6 following days.
     events = Event.where('starts_at < ?', date + 7.days)
-                  .where('starts_at >= ?', date)
+                  .where('starts_at >= ? OR weekly_recurring = ?', date, true)
                   .order(starts_at: :asc)
                   .to_a
 
@@ -15,6 +15,12 @@ class Event < ActiveRecord::Base
     events.map! do |e|
       starts_at = e.starts_at.to_datetime
       ends_at   = e.ends_at.to_datetime
+      if e.weekly_recurring
+        # Shift event dates.
+        offset = ((date - 1 - starts_at.to_date).to_i / 7 + 1).weeks
+        starts_at += offset
+        ends_at   += offset
+      end
       [e.kind.to_sym, starts_at..ends_at]
     end
 
