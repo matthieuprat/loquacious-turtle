@@ -33,6 +33,8 @@ class Event < ActiveRecord::Base
         if event.begin > avail.end
           avails << avail
           avail = event
+        else
+          avail = avail.begin..[avail.end, event.end].max
         end
       when :appointment
         avails << (avail.begin..event.begin)
