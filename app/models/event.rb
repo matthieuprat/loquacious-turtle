@@ -24,7 +24,7 @@ class Event < ActiveRecord::Base
 
     # Compute availability periods.
     avails = [] # Array of date ranges.
-    avail = DateTime.new(0)..DateTime.new(0) # "Fake" availability for initialization.
+    avail = DateTime.new..DateTime.new # "Fake" availability for initialization.
     events.sort_by { |_, e| e.begin }.each do |kind, event|
       case kind
       when :opening
