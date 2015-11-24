@@ -22,10 +22,16 @@ class Event < ActiveRecord::Base
       [e.kind.to_sym, starts_at..ends_at]
     end
 
+    events.sort_by! { |_, e| e.begin }
+
     # Compute availability periods.
-    avails = [] # Array of date ranges.
-    avail = DateTime.new..DateTime.new # "Fake" availability for initialization.
-    events.sort_by { |_, e| e.begin }.each do |kind, event|
+    avails = [] # Array of date ranges representing availability periods.
+    avail = nil # Next (candidate) availability period.
+    unless events.empty?
+      kind, avail = events.shift
+      avail = avail.end..avail.end if kind == :appointment
+    end
+    events.each do |kind, event|
       case kind
       when :opening
         if event.begin > avail.end
@@ -40,8 +46,7 @@ class Event < ActiveRecord::Base
         avail = event.end..[avail.end, event.end].max
       end
     end
-    avails << avail
-    avails.shift # Slash the fake availability.
+    avails << avail if avail
 
     # Chunk availability periods into slots and group them by day.
     slots = avails.map { |a| a.begin.step(a.end - duration, duration) }
