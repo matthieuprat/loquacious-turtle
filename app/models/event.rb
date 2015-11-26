@@ -5,8 +5,35 @@ class Event < ActiveRecord::Base
     date = date.to_date
 
     events = self.fetch(date, date + 7.days)
+    slots = self.discretize(events, duration)
 
-    # Extract available slots from events (grouped them by day).
+    # Return available slots for `date` and the 6 following days.
+    date.upto(date + 6.days).map do |date|
+      { date: date, slots: (slots[date] || []).map { |s| s.strftime('%-H:%M') } }
+    end
+  end
+
+  private
+
+  # Retrieve all events affecting the supplied date range.
+  def self.fetch(from, to)
+    events = Event.where('starts_at < ?', to)
+                  .where('starts_at >= ? OR weekly_recurring = ?', from, true)
+                  .order(starts_at: :asc)
+
+    events.map do |event|
+      if event.weekly_recurring
+        # Shift event dates.
+        offset = ((from - 1 - event.starts_at.to_date).to_i / 7 + 1).weeks
+        event.starts_at += offset
+        event.ends_at   += offset
+      end
+      event
+    end
+  end
+
+  # Extract available slots from events, grouped by day.
+  def self.discretize(events, duration)
     availabilities = {}
     events.group_by { |e| e.starts_at.to_date }.map do |date, events|
       # Find the highest suitable pitch to discretize events.
@@ -43,46 +70,6 @@ class Event < ActiveRecord::Base
       availabilities[date] = slots
     end
 
-    # Return available slots for `date` and the 6 following days.
-    date.upto(date + 6.days).map do |date|
-      slots = availabilities[date] || []
-      { date: date, slots: slots.map { |s| s.strftime('%-H:%M') } }
-    end
-  end
-
-  private
-
-  # Retrieve all events affecting the supplied date range.
-  def self.fetch(from, to)
-    events = Event.where('starts_at < ?', to)
-                  .where('starts_at >= ? OR weekly_recurring = ?', from, true)
-                  .order(starts_at: :asc)
-
-    events.map do |event|
-      if event.weekly_recurring
-        # Shift event dates.
-        offset = ((from - 1 - event.starts_at.to_date).to_i / 7 + 1).weeks
-        event.starts_at += offset
-        event.ends_at   += offset
-      end
-      event
-    end
-  end
-
-  # Retrieve all events affecting the supplied date range.
-  def self.discretize(from, to)
-    events = Event.where('starts_at < ?', to)
-                  .where('starts_at >= ? OR weekly_recurring = ?', from, true)
-                  .order(starts_at: :asc)
-
-    events.map do |event|
-      if event.weekly_recurring
-        # Shift event dates.
-        offset = ((from - 1 - event.starts_at.to_date).to_i / 7 + 1).weeks
-        event.starts_at += offset
-        event.ends_at   += offset
-      end
-      event
-    end
+    availabilities
   end
 end
