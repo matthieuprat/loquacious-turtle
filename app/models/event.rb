@@ -1,43 +1,26 @@
 require 'set'
 
 class Event < ActiveRecord::Base
-  def self.availabilities(date_from, duration = 30.minutes)
-    date_from = date_from.to_date
+  def self.availabilities(date, duration = 30.minutes)
+    date = date.to_date
 
-    # Retrieve all events affecting `date_from` and the 6 following days.
-    events = Event.where('starts_at < ?', date_from + 7.days)
-                  .where('starts_at >= ? OR weekly_recurring = ?', date_from, true)
-                  .order(starts_at: :asc)
-
-    # Normalize events.
-    events = events.map do |event|
-      date = event.starts_at.to_date
-
-      # Calculate the number of weeks between the event date and `date_from` (will
-      # be 0 for non-recurring events).
-      offset = ((date_from - 1 - date).to_i / 7 + 1).weeks
-
-      date += offset
-      starts_at, ends_at = [event.starts_at, event.ends_at].map { |d| d.beginning_of_minute + offset }
-
-      { date: date, kind: event.kind, starts_at: starts_at, ends_at: ends_at }
-    end
+    events = self.fetch(date, date + 7.days)
 
     # Extract available slots from events (grouped them by day).
     availabilities = {}
-    events.group_by { |e| e[:date] }.map do |date, events|
+    events.group_by { |e| e.starts_at.to_date }.map do |date, events|
       # Find the highest suitable pitch to discretize events.
-      first = events[0][:starts_at]
+      first = events[0].starts_at
       pitch = events.reduce(duration / 1.minute) { |pitch, event|
-        [event[:starts_at], event[:ends_at]].map { |t| pitch.gcd((t - first).to_i / 60) }.min
+        [event.starts_at, event.ends_at].map { |t| pitch.gcd((t - first).to_i / 60) }.min
       }.minutes
 
       # Discretize events and group them by kind.
       slots = { 'opening' => SortedSet.new, 'appointment' => Set.new }
       events.each do |event|
-        slot = event[:starts_at]
-        while slot < event[:ends_at] do
-          slots[event[:kind]] << slot
+        slot = event.starts_at
+        while slot < event.ends_at do
+          slots[event.kind] << slot
           slot += pitch
         end
       end
@@ -60,10 +43,46 @@ class Event < ActiveRecord::Base
       availabilities[date] = slots
     end
 
-    # Return available slots for `date_from` and the 6 following days.
-    date_from.upto(date_from + 6.days).map do |date|
+    # Return available slots for `date` and the 6 following days.
+    date.upto(date + 6.days).map do |date|
       slots = availabilities[date] || []
       { date: date, slots: slots.map { |s| s.strftime('%-H:%M') } }
+    end
+  end
+
+  private
+
+  # Retrieve all events affecting the supplied date range.
+  def self.fetch(from, to)
+    events = Event.where('starts_at < ?', to)
+                  .where('starts_at >= ? OR weekly_recurring = ?', from, true)
+                  .order(starts_at: :asc)
+
+    events.map do |event|
+      if event.weekly_recurring
+        # Shift event dates.
+        offset = ((from - 1 - event.starts_at.to_date).to_i / 7 + 1).weeks
+        event.starts_at += offset
+        event.ends_at   += offset
+      end
+      event
+    end
+  end
+
+  # Retrieve all events affecting the supplied date range.
+  def self.discretize(from, to)
+    events = Event.where('starts_at < ?', to)
+                  .where('starts_at >= ? OR weekly_recurring = ?', from, true)
+                  .order(starts_at: :asc)
+
+    events.map do |event|
+      if event.weekly_recurring
+        # Shift event dates.
+        offset = ((from - 1 - event.starts_at.to_date).to_i / 7 + 1).weeks
+        event.starts_at += offset
+        event.ends_at   += offset
+      end
+      event
     end
   end
 end
